@@ -52,6 +52,11 @@ regla del dominio), no a este repo.
 - Build de iOS **no verificado todavía** — depende del runner macOS de CI,
   que a su vez depende de una cuenta de Apple Developer Program que todavía
   no existe.
+- Prueba en emulador Android **en pausa**: SDK completo + AVD
+  (`sazono_staff_test`, Pixel 6 / Android 34) ya están listos, pero el
+  emulador necesita Windows Hypervisor Platform y esa máquina todavía no se
+  reinició después de habilitarlo (ver README, sección "Prueba en emulador").
+  Retomar ahí, no repetir el setup de SDK/AVD.
 - `.github/workflows/ios-build.yml` + `ios/fastlane/` (Appfile/Fastfile)
   listos pero bloqueados por falta de: cuenta Apple Developer Program, app
   registrada en App Store Connect, API Key, repo de `fastlane match`. Todo
@@ -80,8 +85,9 @@ regla del dominio), no a este repo.
 
 ## Siguiente paso sugerido para este repo
 
-1. Probar la app en el emulador Android contra el dev server de `sazono-ui`
-   (`npx cap run android`, con `sazono-ui` corriendo en `localhost:3000`).
+1. Reiniciar la máquina de desarrollo (pendiente para que WHPX quede activo),
+   levantar el emulador `sazono_staff_test` y correr `npx cap run android`
+   contra `sazono-ui`/backend ya corriendo en `:3000`/`:5000`.
 2. Decidir y crear el proyecto de Firebase para push notifications.
 3. Cuando exista cuenta de Apple Developer: completar `ios/fastlane/Appfile`
    y los secrets de GitHub Actions, y correr `ios-build.yml` por primera vez.

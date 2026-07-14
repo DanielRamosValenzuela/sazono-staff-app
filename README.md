@@ -39,6 +39,48 @@ WebView carga `server.url` (ver `capacitor.config.json`), que debe apuntar a
   esto solo importa para build desde línea de comandos/CI.
 - `@capacitor/push-notifications` (fase 1 del doc 13) todavía no se instaló:
   requiere decidir/crear el proyecto de Firebase Cloud Messaging primero.
+- Repo en GitHub, público:
+  https://github.com/DanielRamosValenzuela/sazono-staff-app (decisión: Actions
+  gratis sin límite de minutos en runners macOS, que en repos privados
+  consumen a 10x; el código con lógica real ya es público en los repos
+  hermanos, así que este shell no suma exposición nueva).
+
+## Prueba en emulador — EN PAUSA (bloqueada por reinicio pendiente)
+
+Se preparó todo para probar la app contra los dev servers reales
+(`sazono-ui` en `:3000`, backend en `:5000`, ambos confirmados arriba
+respondiendo):
+
+- SDK completo instalado en `%LOCALAPPDATA%\Android\Sdk`: `platform-tools`,
+  `platforms;android-36`, `build-tools;36.1.0`, `emulator`,
+  `system-images;android-34;google_apis;x86_64`.
+- AVD creado: `sazono_staff_test` (Pixel 6, Android 34, x86_64, google_apis).
+
+**Bloqueado en**: el emulador x86_64 necesita Windows Hypervisor Platform
+(WHPX). La virtualización ya está habilitada en el firmware/BIOS (verificado
+con `systeminfo`), pero falta la característica de Windows. Se corrió
+`Enable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -All -NoRestart`
+— PowerShell reportó que no hacía falta reiniciar, pero el emulador siguió
+fallando con el mismo error (`Android Emulator hypervisor driver is not
+installed on this machine`) después de correrlo. Es un caso conocido: el
+driver (`whvp.sys`) queda marcado como habilitado a nivel de imagen de
+Windows pero el kernel no lo carga hasta el próximo arranque real. **Falta
+reiniciar la máquina.**
+
+**Para retomar después del reinicio:**
+
+```bash
+# 1. Confirmar que sazono-ui (:3000) y el backend (:5000) siguen corriendo
+# 2. Levantar el emulador
+"C:\Users\<user>\AppData\Local\Android\Sdk\emulator\emulator.exe" -avd sazono_staff_test -no-snapshot -gpu swiftshader_indirect
+# 3. Esperar a que termine de bootear (adb wait-for-device + getprop sys.boot_completed)
+# 4. Instalar y correr
+npx cap run android
+```
+
+`server.url` ya está en `http://10.0.2.2:3000/staff` (alias del emulador
+hacia el `localhost` del host), así que no hace falta tocar la config para
+esta prueba local.
 
 ## CI de iOS (`.github/workflows/ios-build.yml`)
 
