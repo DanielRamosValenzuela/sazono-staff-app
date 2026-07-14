@@ -24,10 +24,19 @@ WebView carga `server.url` (ver `capacitor.config.json`), que debe apuntar a
   `sazono-ui` corriendo en la misma máquina. Antes de un build de
   staging/producción, cambiar a la URL real (https) y poner
   `cleartext: false`.
-- Compilar y correr el APK requiere Android Studio / Android SDK instalado
-  (no verificado en esta máquina: no había `ANDROID_HOME` configurado al
-  momento de escribir esto). Sin eso, `npx cap open android` /
-  `npx cap run android` van a fallar.
+- **Build de Android verificado de punta a punta**: `./gradlew assembleDebug`
+  corre limpio y genera
+  `android/app/build/outputs/apk/debug/app-debug.apk`. SDK instalado vía
+  command-line tools (`platform-tools`, `platforms;android-36`,
+  `build-tools;36.1.0`) en la ruta default
+  `%LOCALAPPDATA%\Android\Sdk`, referenciada en `android/local.properties`
+  (gitignored, es específico de cada máquina — cada dev necesita el suyo).
+- **Gotcha de JDK**: el JDK 25 del sistema (`java -version`) hace fallar
+  Gradle 8.14 (`Unsupported class file major version 69` — Gradle 8.14
+  todavía no soporta JDK 25). Hay que buildear con el JDK 21 embebido en
+  Android Studio (`JBR`), no con el del sistema — ver comando abajo. Android
+  Studio ya usa su propio JBR automáticamente al abrir el proyecto, así que
+  esto solo importa para build desde línea de comandos/CI.
 - `@capacitor/push-notifications` (fase 1 del doc 13) todavía no se instaló:
   requiere decidir/crear el proyecto de Firebase Cloud Messaging primero.
 
@@ -61,4 +70,8 @@ npm install                 # dependencias
 npx cap sync android         # propaga config/plugins al proyecto Android
 npx cap sync ios             # idem para iOS
 npx cap open android         # abre Android Studio (requiere tenerlo instalado)
+
+# Build de debug desde línea de comandos (Windows, ver gotcha de JDK arriba):
+cd android
+JAVA_HOME="C:\Program Files\Android\Android Studio\jbr" ./gradlew.bat assembleDebug
 ```
