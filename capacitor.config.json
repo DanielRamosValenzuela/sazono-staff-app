@@ -1,0 +1,9 @@
+{
+  "appId": "com.sazono.staff",
+  "appName": "Sazono Staff",
+  "webDir": "www",
+  "server": {
+    "url": "http://10.0.2.2:3000/staff",
+    "cleartext": true
+  }
+}

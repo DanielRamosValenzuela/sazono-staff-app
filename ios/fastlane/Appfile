@@ -1,0 +1,9 @@
+# Ver docs/13-app-mesero-capacitor.md (sazono-ui) para el contexto de esta decision.
+#
+# Requiere una cuenta de Apple Developer Program (USD 99/año) que todavia
+# no existe para Sazono. Completar estos tres valores antes de correr
+# cualquier lane de fastlane:
+
+app_identifier("com.sazono.staff")
+apple_id("TODO_APPLE_ID@example.com") # cuenta de Apple Developer del equipo
+team_id("TODO_APPLE_DEVELOPER_TEAM_ID") # Apple Developer Program > Membership

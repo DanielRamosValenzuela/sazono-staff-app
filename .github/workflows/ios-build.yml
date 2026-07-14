@@ -1,0 +1,40 @@
+name: iOS Build (TestFlight)
+
+# Manual por ahora a proposito: los secrets de firma (ver fastlane/Fastfile)
+# todavia no existen, asi que un trigger automatico en cada push solo
+# fallaria en rojo sin avisar nada util. Cambiar a `push`/`pull_request`
+# cuando la cuenta de Apple Developer y match esten configurados.
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    # Unico runner que puede compilar/firmar un binario iOS (Xcode es
+    # macOS-only). Ver docs/13-app-mesero-capacitor.md.
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync Capacitor iOS project
+        run: npx cap sync ios
+
+      - name: Install fastlane
+        run: gem install fastlane --no-document
+
+      - name: Build and upload to TestFlight
+        working-directory: ios
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        run: fastlane beta
