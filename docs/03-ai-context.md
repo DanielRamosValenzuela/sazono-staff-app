@@ -41,6 +41,16 @@ regla del dominio), no a este repo.
 - Inventar un mecanismo de login propio para esta app — el login por PIN /
   sesión de terminal (pendiente, ver abajo) se diseña primero en
   `sazono-backend-monolith` (módulo `auth`/`staff`) y en `sazono-ui`, no acá.
+- Escribir código de feature (registro de push, listeners, storage) en este
+  repo — ya se comprobó con push-notifications que ese código va en
+  `sazono-ui` (`src/features/push-notifications/`), porque es el WebView el
+  que ejecuta JS, no este shell. Este repo solo aporta plugin nativo +
+  archivo de config (`google-services.json`, `GoogleService-Info.plist`).
+- Probar cambios de `sazono-ui` en el emulador contra `npm run dev` — hay un
+  bug real (ver README, sección "Prueba en emulador") donde Turbopack en
+  modo desarrollo se cuelga hidratando dentro del WebView. Usar
+  `npm run build && npm run start` para cualquier prueba visual en el
+  emulador/dispositivo.
 
 ## Estado actual del repo
 
@@ -52,18 +62,21 @@ regla del dominio), no a este repo.
 - Build de iOS **no verificado todavía** — depende del runner macOS de CI,
   que a su vez depende de una cuenta de Apple Developer Program que todavía
   no existe.
-- Prueba en emulador Android **en pausa**: SDK completo + AVD
-  (`sazono_staff_test`, Pixel 6 / Android 34) ya están listos, pero el
-  emulador necesita Windows Hypervisor Platform y esa máquina todavía no se
-  reinició después de habilitarlo (ver README, sección "Prueba en emulador").
-  Retomar ahí, no repetir el setup de SDK/AVD.
+- **Prueba en emulador Android: funciona** (2026-07-20). El bloqueo de WHPX
+  se resolvió con un reinicio de la máquina (no relacionado, no fue una
+  acción deliberada). Hay dos AVDs: `sazono_staff_test` (WebView viejo,
+  113, sin Play Store) y `sazono_staff_playstore` (preferir este — WebView
+  actualizable). Detalle completo, incluyendo un gotcha importante sobre
+  usar build de producción en vez del dev server, en README.
+- **`@capacitor/push-notifications` instalado y probado de punta a punta en
+  Android** (token FCM real obtenido, notificación de prueba recibida).
+  Detalle completo en README, sección "Push notifications". El código de
+  registro/listeners vive en `sazono-ui`, no acá.
 - `.github/workflows/ios-build.yml` + `ios/fastlane/` (Appfile/Fastfile)
   listos pero bloqueados por falta de: cuenta Apple Developer Program, app
   registrada en App Store Connect, API Key, repo de `fastlane match`. Todo
   con TODOs explícitos en los archivos correspondientes, no valores
   inventados.
-- `@capacitor/push-notifications` todavía no se instaló — requiere definir
-  primero el proyecto de Firebase Cloud Messaging.
 - Repo público en GitHub
   (`https://github.com/DanielRamosValenzuela/sazono-staff-app`) — decisión
   tomada por el ahorro de minutos de CI en runners macOS (10x el consumo en
@@ -78,16 +91,31 @@ regla del dominio), no a este repo.
    `sazono-backend-monolith` y `sazono-ui`; acá solo correspondería migrar
    el storage de sesión a `@capacitor/preferences` (Keychain/Keystore) una
    vez que exista.
-2. **Firebase Cloud Messaging** — crear el proyecto antes de poder instalar
-   `@capacitor/push-notifications`.
-3. **Cuenta Apple Developer Program** — bloquea todo el pipeline de iOS
-   (build, firma, TestFlight, App Store).
+2. **Push notifications en primer plano** — hoy `pushNotificationReceived`
+   solo loguea a consola (`sazono-ui/src/features/push-notifications/`); si
+   la app está abierta no aparece ningún banner (comportamiento normal de
+   FCM, no un bug). Falta `@capacitor/local-notifications` para mostrar la
+   alerta manualmente en ese caso.
+3. **Backend: enviar pushes reales.** Cero infraestructura hoy (sin modelo
+   de token de dispositivo, sin servicio de envío, `EventEmitterModule`
+   registrado pero sin uso). Ver README, sección "Push notifications", para
+   los puntos de enganche identificados y las variables de entorno ya
+   preparadas en `sazono-backend-monolith/.env.example`.
+4. **Cuenta Apple Developer Program** — bloquea todo el pipeline de iOS
+   (build, firma, TestFlight, App Store), y también el registro de la app
+   iOS en Firebase para push (necesita una APNs key .p8 de esa cuenta).
 
 ## Siguiente paso sugerido para este repo
 
-1. Reiniciar la máquina de desarrollo (pendiente para que WHPX quede activo),
-   levantar el emulador `sazono_staff_test` y correr `npx cap run android`
-   contra `sazono-ui`/backend ya corriendo en `:3000`/`:5000`.
-2. Decidir y crear el proyecto de Firebase para push notifications.
+1. Instalar `@capacitor/local-notifications` y mostrar la notificación
+   manualmente cuando `pushNotificationReceived` llega con la app en
+   primer plano (ver pendiente 2 arriba); de paso, probar qué pasa con la
+   app en segundo plano (debería mostrarla el sistema operativo solo).
+2. Diseñar el modelo de datos y el servicio de backend para guardar tokens
+   de dispositivo por `staff_user` y disparar notificaciones reales en los
+   dos puntos de enganche ya identificados (nueva orden de mesero, ticket
+   listo).
 3. Cuando exista cuenta de Apple Developer: completar `ios/fastlane/Appfile`
-   y los secrets de GitHub Actions, y correr `ios-build.yml` por primera vez.
+   y los secrets de GitHub Actions, correr `ios-build.yml` por primera vez,
+   y registrar la app iOS en Firebase para push (bundle id
+   `com.sazono.staff`, subir APNs key .p8).

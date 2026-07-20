@@ -37,50 +37,157 @@ WebView carga `server.url` (ver `capacitor.config.json`), que debe apuntar a
   Android Studio (`JBR`), no con el del sistema — ver comando abajo. Android
   Studio ya usa su propio JBR automáticamente al abrir el proyecto, así que
   esto solo importa para build desde línea de comandos/CI.
-- `@capacitor/push-notifications` (fase 1 del doc 13) todavía no se instaló:
-  requiere decidir/crear el proyecto de Firebase Cloud Messaging primero.
+- **`@capacitor/push-notifications` instalado y probado de punta a punta en
+  Android** (2026-07-20). Ver sección "Push notifications" más abajo para el
+  detalle completo — resumen: funciona, pero el código que registra el
+  dispositivo vive en `sazono-ui`, no en este repo.
 - Repo en GitHub, público:
   https://github.com/DanielRamosValenzuela/sazono-staff-app (decisión: Actions
   gratis sin límite de minutos en runners macOS, que en repos privados
   consumen a 10x; el código con lógica real ya es público en los repos
   hermanos, así que este shell no suma exposición nueva).
 
-## Prueba en emulador — EN PAUSA (bloqueada por reinicio pendiente)
+## Prueba en emulador — FUNCIONA (2026-07-20)
 
-Se preparó todo para probar la app contra los dev servers reales
-(`sazono-ui` en `:3000`, backend en `:5000`, ambos confirmados arriba
-respondiendo):
+El bloqueo de Windows Hypervisor Platform (WHPX) que tenía esto pausado **se
+resolvió solo**: un reinicio de la máquina (2026-07-17, por motivo no
+relacionado) fue suficiente para que el kernel cargara el driver `whvp.sys`.
+Confirmado en el log del emulador: `WHPX ... accelerator is operational`.
 
 - SDK completo instalado en `%LOCALAPPDATA%\Android\Sdk`: `platform-tools`,
-  `platforms;android-36`, `build-tools;36.1.0`, `emulator`,
-  `system-images;android-34;google_apis;x86_64`.
-- AVD creado: `sazono_staff_test` (Pixel 6, Android 34, x86_64, google_apis).
+  `platforms;android-36`, `build-tools;36.1.0`, `emulator`, y dos
+  system-images:
+  - `system-images;android-34;google_apis;x86_64` — AVD `sazono_staff_test`.
+    WebView/Chrome congelado en la versión que trae la imagen (113, ~2023):
+    esta variante no tiene Play Store, así que no se actualiza solo.
+  - `system-images;android-36;google_apis_playstore;x86_64` — AVD
+    `sazono_staff_playstore` (Pixel 6). **Usar este por default**: al tener
+    Play Store, el WebView se puede actualizar (quedó en 133). Se creó
+    después de sospechar (incorrectamente, ver más abajo) que el WebView
+    viejo era la causa de un bug de hidratación.
 
-**Bloqueado en**: el emulador x86_64 necesita Windows Hypervisor Platform
-(WHPX). La virtualización ya está habilitada en el firmware/BIOS (verificado
-con `systeminfo`), pero falta la característica de Windows. Se corrió
-`Enable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -All -NoRestart`
-— PowerShell reportó que no hacía falta reiniciar, pero el emulador siguió
-fallando con el mismo error (`Android Emulator hypervisor driver is not
-installed on this machine`) después de correrlo. Es un caso conocido: el
-driver (`whvp.sys`) queda marcado como habilitado a nivel de imagen de
-Windows pero el kernel no lo carga hasta el próximo arranque real. **Falta
-reiniciar la máquina.**
-
-**Para retomar después del reinicio:**
+**Comandos:**
 
 ```bash
-# 1. Confirmar que sazono-ui (:3000) y el backend (:5000) siguen corriendo
+# 1. Confirmar que sazono-ui (:3000) y el backend (:5000) estan corriendo
 # 2. Levantar el emulador
-"C:\Users\<user>\AppData\Local\Android\Sdk\emulator\emulator.exe" -avd sazono_staff_test -no-snapshot -gpu swiftshader_indirect
-# 3. Esperar a que termine de bootear (adb wait-for-device + getprop sys.boot_completed)
-# 4. Instalar y correr
-npx cap run android
+"%LOCALAPPDATA%\Android\Sdk\emulator\emulator.exe" -avd sazono_staff_playstore -no-snapshot -gpu swiftshader_indirect
+# 3. Esperar a que termine de bootear
+"%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe" wait-for-device
+# (loop hasta que "getprop sys.boot_completed" devuelva 1)
+
+# 4. npx cap run android FALLA en Git Bash de este entorno con
+#    "gradlew" no se reconoce como un comando interno o externo" — no
+#    resuelve el binario en Windows. Usar el camino manual:
+cd android
+JAVA_HOME="C:\Program Files\Android\Android Studio\jbr" ./gradlew.bat assembleDebug
+cd ..
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+adb shell monkey -p com.sazono.staff -c android.intent.category.LAUNCHER 1
 ```
+
+**Gotcha importante — usar build de PRODUCCIÓN de `sazono-ui`, no el dev
+server, para probar en el emulador.** Contra `npm run dev` (Turbopack), la
+app carga pero se queda congelada para siempre en el primer skeleton de
+carga (`widgets/admin-shell/ui/admin-shell.tsx`, rama
+`!session.isClientReady`), sin ningún error en consola. Se investigó a
+fondo (Chrome DevTools Protocol conectado directo al WebView vía
+`adb forward tcp:9222 localabstract:webview_devtools_remote_<pid>`, sin
+depender de la extensión de Chrome): `document.readyState` completo, cero
+recursos pendientes, cero excepciones — la hidratación de React
+simplemente nunca termina un commit. Se probó también con Chrome/WebView
+133 (AVD con Play Store) y pasó igual, descartando versión de WebView como
+causa. Se abrió la misma URL en Chrome de escritorio contra el mismo dev
+server y ahí hidrató perfecto — aislando el bug al WebView/Capacitor
+específicamente. **Con `npm run build && npm run start` en vez de
+`npm run dev`, hidrata perfecto también dentro del emulador.** No se
+investigó la causa exacta dentro de Turbopack (probablemente algo del
+cliente de HMR/module runtime que no complementa con el WebView); no
+bloquea nada real porque TestFlight/Play Store/producción siempre usan
+build de producción. Para iterar visualmente contra el emulador: parar el
+dev server, `cd sazono-ui && npm run build && npm run start`, y cuando se
+vuelva a `npm run dev` después, borrar `.next` antes de reiniciar (alternar
+build/dev sobre la misma carpeta `.next` corrompe el caché de rutas de
+Turbopack — mismo síntoma que el gotcha ya documentado en
+`sazono-ui/docs` de manifest de rutas fantasma).
 
 `server.url` ya está en `http://10.0.2.2:3000/staff` (alias del emulador
 hacia el `localhost` del host), así que no hace falta tocar la config para
 esta prueba local.
+
+## Push notifications (Firebase Cloud Messaging) — Android funcionando de punta a punta (2026-07-20)
+
+**El código que registra el dispositivo y escucha las notificaciones vive
+en `sazono-ui`, NO en este repo** (`src/features/push-notifications/model/use-push-registration.ts`,
+enganchado en `widgets/admin-shell/ui/admin-shell.tsx` vía
+`usePushRegistration()`). Este repo solo aporta el lado nativo: el archivo
+de config y el plugin sincronizado.
+
+**Hecho:**
+- Proyecto Firebase creado ("Sazono", plan Spark) y app Android registrada
+  con package name `com.sazono.staff`.
+- `google-services.json` colocado en `android/app/google-services.json` y
+  agregado a `.gitignore` (se activó la línea que el template de Capacitor
+  ya traía comentada) — no se sube al repo público. El proyecto YA tenía
+  pre-cableado el lado Gradle (boilerplate estándar de Capacitor al
+  generar `android/`, no trabajo manual): `android/build.gradle` con el
+  classpath `com.google.gms:google-services:4.4.4`, y
+  `android/app/build.gradle` con un bloque que aplica el plugin
+  automáticamente si encuentra el archivo.
+- `@capacitor/push-notifications@8.1.2` instalado en ambos repos
+  (`sazono-staff-app` para el plugin nativo, `sazono-ui` para la API JS +
+  `@capacitor/core`) y sincronizado (`npx cap sync android`).
+- Permiso runtime de Android 13+ (`POST_NOTIFICATIONS`): lo pide el propio
+  plugin en `checkPermissions()`/`requestPermissions()`, no hace falta
+  tocar `AndroidManifest.xml` a mano.
+- **Probado de punta a punta contra el build de producción**: token FCM
+  real obtenido (`PushNotifications.register()` → evento `registration`
+  con el token), y una notificación de prueba mandada a mano desde
+  Firebase Console (Cloud Messaging → Send test message, pegando el
+  token) **llegó** — confirmado por el evento nativo
+  `pushNotificationReceived` en logcat.
+- **Contra el dev server (Turbopack) hay una carrera real**: el plugin
+  nativo puede disparar el evento `registration` con el token ANTES de que
+  el código JS (que recién carga cuando termina de compilar/hidratar el
+  bundle) alcance a registrar el listener — se pierde el token
+  (`No listeners found for event registration` en logcat). No pasa contra
+  producción, que carga casi instantáneo. Un `Uncaught TypeError: Cannot
+  read properties of undefined (reading 'triggerEvent')` también apareció
+  solo en dev mode, sin investigar la causa exacta (no reprodujo en prod).
+
+**Pendiente (próximo paso inmediato):**
+- Cuando la notificación llega con la app en **primer plano**, hoy solo se
+  loguea a consola (`console.log` en `use-push-registration.ts`) — no
+  aparece ningún banner visible, que es el comportamiento normal de FCM
+  (no muestra bandeja del sistema si la app está abierta, le delega el
+  evento a la app). Para el caso real (mesero/cocina con la app abierta en
+  mano) hace falta instalar `@capacitor/local-notifications` y, en el
+  handler de `pushNotificationReceived`, mostrar una notificación local
+  (banner + sonido) manualmente. No se probó qué pasa con la app en
+  segundo plano (ahí Android sí debería mostrarla sola, sin código
+  adicional) — sería bueno confirmarlo también.
+- El backend (`sazono-backend-monolith`) **no tiene ninguna
+  infraestructura de push todavía**: cero modelo de datos para guardar
+  tokens de dispositivo por `staff_user`, cero servicio que hable con el
+  Admin SDK de Firebase para mandar pushes reales. `EventEmitterModule` de
+  NestJS está registrado globalmente pero sin ningún `@OnEvent`/`.emit()`
+  en uso hoy. Los dos puntos de enganche naturales identificados: al crear
+  una orden de mesero (`create-waiter-order.service.ts`, nuevos
+  `station_tickets`) para notificar cocina/barra, y al avanzar un ticket a
+  `READY` (`update-station-ticket-status.service.ts`) para notificar al
+  mesero. Se dejaron ya las variables preparadas (vacías, comentadas) en
+  `sazono-backend-monolith/.env.example` para las credenciales del Admin
+  SDK (`FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`,
+  `FIREBASE_PRIVATE_KEY`) — se obtienen en Firebase Console → Project
+  Settings → Service Accounts → Generate new private key, cuando se
+  implemente esto.
+- iOS: sigue sin tocar (bloqueado por Apple Developer Program, ver sección
+  de CI más abajo). Cuando exista esa cuenta, falta además: registrar la
+  app iOS en el mismo proyecto Firebase (bundle id `com.sazono.staff`),
+  descargar `GoogleService-Info.plist` a `ios/App/App/`, agregar el paquete
+  SPM `FirebaseMessaging` en Xcode, generar la APNs Authentication Key
+  (.p8) desde Apple Developer y subirla en Firebase Console → Project
+  Settings → Cloud Messaging → Apple app configuration.
 
 ## CI de iOS (`.github/workflows/ios-build.yml`)
 
