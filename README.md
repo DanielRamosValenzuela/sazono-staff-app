@@ -41,6 +41,11 @@ WebView carga `server.url` (ver `capacitor.config.json`), que debe apuntar a
   Android** (2026-07-20). Ver sección "Push notifications" más abajo para el
   detalle completo — resumen: funciona, pero el código que registra el
   dispositivo vive en `sazono-ui`, no en este repo.
+- **`@capacitor/local-notifications` y `@capacitor/preferences` instalados y
+  sincronizados** (2026-07-21) — banner de push en primer plano y storage
+  seguro de sesión/PIN. Igual que arriba, el código vive en `sazono-ui`. Detalle
+  completo en `sazono-ui/docs/16-notificaciones-push-y-login-por-pin.md` y
+  `sazono-backend-monolith/docs/19-notificaciones-push-y-login-por-pin.md`.
 - Repo en GitHub, público:
   https://github.com/DanielRamosValenzuela/sazono-staff-app (decisión: Actions
   gratis sin límite de minutos en runners macOS, que en repos privados
@@ -155,32 +160,20 @@ de config y el plugin sincronizado.
   read properties of undefined (reading 'triggerEvent')` también apareció
   solo en dev mode, sin investigar la causa exacta (no reprodujo en prod).
 
-**Pendiente (próximo paso inmediato):**
-- Cuando la notificación llega con la app en **primer plano**, hoy solo se
-  loguea a consola (`console.log` en `use-push-registration.ts`) — no
-  aparece ningún banner visible, que es el comportamiento normal de FCM
-  (no muestra bandeja del sistema si la app está abierta, le delega el
-  evento a la app). Para el caso real (mesero/cocina con la app abierta en
-  mano) hace falta instalar `@capacitor/local-notifications` y, en el
-  handler de `pushNotificationReceived`, mostrar una notificación local
-  (banner + sonido) manualmente. No se probó qué pasa con la app en
-  segundo plano (ahí Android sí debería mostrarla sola, sin código
-  adicional) — sería bueno confirmarlo también.
-- El backend (`sazono-backend-monolith`) **no tiene ninguna
-  infraestructura de push todavía**: cero modelo de datos para guardar
-  tokens de dispositivo por `staff_user`, cero servicio que hable con el
-  Admin SDK de Firebase para mandar pushes reales. `EventEmitterModule` de
-  NestJS está registrado globalmente pero sin ningún `@OnEvent`/`.emit()`
-  en uso hoy. Los dos puntos de enganche naturales identificados: al crear
-  una orden de mesero (`create-waiter-order.service.ts`, nuevos
-  `station_tickets`) para notificar cocina/barra, y al avanzar un ticket a
-  `READY` (`update-station-ticket-status.service.ts`) para notificar al
-  mesero. Se dejaron ya las variables preparadas (vacías, comentadas) en
-  `sazono-backend-monolith/.env.example` para las credenciales del Admin
-  SDK (`FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`,
-  `FIREBASE_PRIVATE_KEY`) — se obtienen en Firebase Console → Project
-  Settings → Service Accounts → Generate new private key, cuando se
-  implemente esto.
+**Resuelto (2026-07-21)** — banner en primer plano (`@capacitor/local-notifications`)
+e infra de backend para enviar pushes reales (modelo de token de dispositivo,
+servicio, los dos puntos de enganche de `create-waiter-order.service.ts` y
+`update-station-ticket-status.service.ts`). Detalle completo en
+`sazono-ui/docs/16-notificaciones-push-y-login-por-pin.md` y
+`sazono-backend-monolith/docs/19-notificaciones-push-y-login-por-pin.md`, no se
+repite acá.
+
+**Pendiente:**
+- Envío real de punta a punta sin probar — faltan las credenciales del Admin SDK
+  (`FIREBASE_PROJECT_ID`/`CLIENT_EMAIL`/`PRIVATE_KEY` en
+  `sazono-backend-monolith/.env`, hoy vacías) y mandar un push FCM real con la
+  app en primer plano (solo se probó el plugin de notificaciones locales en
+  aislamiento, no el pipeline completo).
 - iOS: sigue sin tocar (bloqueado por Apple Developer Program, ver sección
   de CI más abajo). Cuando exista esa cuenta, falta además: registrar la
   app iOS en el mismo proyecto Firebase (bundle id `com.sazono.staff`),

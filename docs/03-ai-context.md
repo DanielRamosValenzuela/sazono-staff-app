@@ -38,9 +38,11 @@ regla del dominio), no a este repo.
   el valor de `server.url` que vive en el repo es el de desarrollo a
   propósito; el cambio a staging/producción es un paso manual documentado
   antes de cada build de distribución (ver README).
-- Inventar un mecanismo de login propio para esta app — el login por PIN /
-  sesión de terminal (pendiente, ver abajo) se diseña primero en
-  `sazono-backend-monolith` (módulo `auth`/`staff`) y en `sazono-ui`, no acá.
+- Inventar un mecanismo de login propio para esta app — el login por PIN ya
+  existe (2026-07-21, ver `sazono-ui/docs/16-notificaciones-push-y-login-por-pin.md`
+  y `sazono-backend-monolith/docs/19-notificaciones-push-y-login-por-pin.md`),
+  vive en `sazono-backend-monolith` (módulo `auth`) y en `sazono-ui`
+  (`features/pin-login/`), no acá.
 - Escribir código de feature (registro de push, listeners, storage) en este
   repo — ya se comprobó con push-notifications que ese código va en
   `sazono-ui` (`src/features/push-notifications/`), porque es el WebView el
@@ -72,6 +74,11 @@ regla del dominio), no a este repo.
   Android** (token FCM real obtenido, notificación de prueba recibida).
   Detalle completo en README, sección "Push notifications". El código de
   registro/listeners vive en `sazono-ui`, no acá.
+- **`@capacitor/local-notifications` y `@capacitor/preferences` instalados y
+  sincronizados** (android/ios), 2026-07-21 — banner de push en primer plano y
+  storage seguro de sesión/PIN respectivamente. Mismo patrón que arriba: el
+  código vive en `sazono-ui`, acá solo el plugin nativo. Ver
+  `sazono-ui/docs/16-notificaciones-push-y-login-por-pin.md`.
 - `.github/workflows/ios-build.yml` + `ios/fastlane/` (Appfile/Fastfile)
   listos pero bloqueados por falta de: cuenta Apple Developer Program, app
   registrada en App Store Connect, API Key, repo de `fastlane match`. Todo
@@ -86,36 +93,30 @@ regla del dominio), no a este repo.
 
 ## Pendientes que no dependen de trabajo en este repo
 
-1. **Login por PIN / sesión de terminal** para dispositivo compartido de
-   piso — diseño e implementación viven principalmente en
-   `sazono-backend-monolith` y `sazono-ui`; acá solo correspondería migrar
-   el storage de sesión a `@capacitor/preferences` (Keychain/Keystore) una
-   vez que exista.
-2. **Push notifications en primer plano** — hoy `pushNotificationReceived`
-   solo loguea a consola (`sazono-ui/src/features/push-notifications/`); si
-   la app está abierta no aparece ningún banner (comportamiento normal de
-   FCM, no un bug). Falta `@capacitor/local-notifications` para mostrar la
-   alerta manualmente en ese caso.
-3. **Backend: enviar pushes reales.** Cero infraestructura hoy (sin modelo
-   de token de dispositivo, sin servicio de envío, `EventEmitterModule`
-   registrado pero sin uso). Ver README, sección "Push notifications", para
-   los puntos de enganche identificados y las variables de entorno ya
-   preparadas en `sazono-backend-monolith/.env.example`.
-4. **Cuenta Apple Developer Program** — bloquea todo el pipeline de iOS
-   (build, firma, TestFlight, App Store), y también el registro de la app
-   iOS en Firebase para push (necesita una APNs key .p8 de esa cuenta).
+**Resuelto 2026-07-21** (ver `sazono-ui/docs/16-notificaciones-push-y-login-por-pin.md`
+y `sazono-backend-monolith/docs/19-notificaciones-push-y-login-por-pin.md` para el
+detalle completo, no se repite acá): login por PIN, banner de push en primer
+plano, e infra de backend para enviar pushes reales (modelo de token de
+dispositivo, servicio, los dos puntos de enganche). Verificado en vivo en
+emulador Android con una cuenta real. Todavía sin commitear en ninguno de los 3
+repos.
+
+1. **Cuenta Apple Developer Program** — sigue siendo el único pendiente real.
+   Bloquea todo el pipeline de iOS (build, firma, TestFlight, App Store), y
+   también el registro de la app iOS en Firebase para push (necesita una APNs
+   key .p8 de esa cuenta).
+2. **Envío real de push de punta a punta sin probar** — las credenciales del
+   Admin SDK de Firebase (`FIREBASE_PROJECT_ID`/`CLIENT_EMAIL`/`PRIVATE_KEY` en
+   `sazono-backend-monolith/.env`) siguen vacías; sin ellas el envío es un
+   no-op silencioso (por diseño, no rompe nada). Tampoco se probó un push FCM
+   real llegando con la app en primer plano (solo se probó el plugin de
+   notificaciones locales en aislamiento).
 
 ## Siguiente paso sugerido para este repo
 
-1. Instalar `@capacitor/local-notifications` y mostrar la notificación
-   manualmente cuando `pushNotificationReceived` llega con la app en
-   primer plano (ver pendiente 2 arriba); de paso, probar qué pasa con la
-   app en segundo plano (debería mostrarla el sistema operativo solo).
-2. Diseñar el modelo de datos y el servicio de backend para guardar tokens
-   de dispositivo por `staff_user` y disparar notificaciones reales en los
-   dos puntos de enganche ya identificados (nueva orden de mesero, ticket
-   listo).
-3. Cuando exista cuenta de Apple Developer: completar `ios/fastlane/Appfile`
-   y los secrets de GitHub Actions, correr `ios-build.yml` por primera vez,
-   y registrar la app iOS en Firebase para push (bundle id
-   `com.sazono.staff`, subir APNs key .p8).
+Nada pendiente específico de este repo por ahora — los 3 frentes de código ya
+implementados no requieren más trabajo en el shell nativo (plugins instalados y
+sincronizados). Cuando exista cuenta de Apple Developer: completar
+`ios/fastlane/Appfile` y los secrets de GitHub Actions, correr `ios-build.yml`
+por primera vez, y registrar la app iOS en Firebase para push (bundle id
+`com.sazono.staff`, subir APNs key .p8).
