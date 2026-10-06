@@ -2,9 +2,9 @@
 
 ## Orden recomendado
 
-1. [01 Product Context Staff App](D:\Programacion\Sazono\sazono-staff-app\docs\01-product-context-staff-app.md)
-2. [02 Architecture](D:\Programacion\Sazono\sazono-staff-app\docs\02-architecture.md)
-3. [03 AI Context](D:\Programacion\Sazono\sazono-staff-app\docs\03-ai-context.md)
+1. [01 Product Context Staff App](01-product-context-staff-app.md)
+2. [02 Architecture](02-architecture.md)
+3. [03 AI Context](03-ai-context.md)
 
 ## Objetivo
 
