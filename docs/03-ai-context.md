@@ -105,12 +105,13 @@ repos.
    Bloquea todo el pipeline de iOS (build, firma, TestFlight, App Store), y
    también el registro de la app iOS en Firebase para push (necesita una APNs
    key .p8 de esa cuenta).
-2. **Envío real de push de punta a punta sin probar** — las credenciales del
-   Admin SDK de Firebase (`FIREBASE_PROJECT_ID`/`CLIENT_EMAIL`/`PRIVATE_KEY` en
-   `sazono-backend-monolith/.env`) siguen vacías; sin ellas el envío es un
-   no-op silencioso (por diseño, no rompe nada). Tampoco se probó un push FCM
-   real llegando con la app en primer plano (solo se probó el plugin de
-   notificaciones locales en aislamiento).
+2. ~~Envío real de push de punta a punta sin probar~~ — **verificado 2026-10-06**:
+   con las credenciales del Admin SDK en `sazono-backend-monolith/.env`, el
+   push "Pedido listo" (ticket de estación `READY` en una mesa virtual) llegó
+   al emulador Android. Sin credenciales el envío sigue siendo un no-op
+   silencioso (por diseño). Sin verificar por separado: push a otros
+   meseros/cajeros en mesas virtuales y la gestión de claves Firebase en
+   producción.
 
 ## Siguiente paso sugerido para este repo
 

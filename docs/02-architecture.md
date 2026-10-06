@@ -52,10 +52,10 @@ artefactos de build y config específica de máquina (`local.properties`,
 
 `gradlew assembleDebug` falla con `Unsupported class file major version 69`
 si `JAVA_HOME`/el JDK del `PATH` es JDK 25 — Gradle 8.14 (el que trae este
-proyecto) todavía no lo soporta. Hay que compilar con el JDK 21 embebido en
-Android Studio (JetBrains Runtime), no con el del sistema. Android Studio ya
-usa su propio JBR automáticamente al abrir el proyecto; esto solo importa
-para build por línea de comandos o CI. Ver comando exacto en `README.md`.
+proyecto) todavía no lo soporta. Hay que compilar con JDK 21 (Temurin) como
+`JAVA_HOME`; a 2026-10-06 el JDK que trae Android Studio también es el 25 y
+tampoco sirve. Esto importa para build por línea de comandos o CI (en Windows,
+`npx cap run android` falla: usar `.\gradlew.bat assembleDebug` + `adb install -r`). Ver comando exacto en `README.md`.
 
 ## CI: por qué GitHub Actions con runner macOS
 

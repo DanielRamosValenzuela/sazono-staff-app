@@ -31,12 +31,26 @@ WebView carga `server.url` (ver `capacitor.config.json`), que debe apuntar a
   `build-tools;36.1.0`) en la ruta default
   `%LOCALAPPDATA%\Android\Sdk`, referenciada en `android/local.properties`
   (gitignored, es específico de cada máquina — cada dev necesita el suyo).
-- **Gotcha de JDK**: el JDK 25 del sistema (`java -version`) hace fallar
-  Gradle 8.14 (`Unsupported class file major version 69` — Gradle 8.14
-  todavía no soporta JDK 25). Hay que buildear con el JDK 21 embebido en
-  Android Studio (`JBR`), no con el del sistema — ver comando abajo. Android
-  Studio ya usa su propio JBR automáticamente al abrir el proyecto, así que
-  esto solo importa para build desde línea de comandos/CI.
+- **Gotcha de JDK**: el JDK 25 (el del sistema y, a 2026-10-06, también el
+  que trae Android Studio) hace fallar Gradle 8.14 (`Unsupported class file
+  major version 69` — Gradle 8.14 todavía no soporta JDK 25). Usar **JDK 21
+  (Temurin)** como `JAVA_HOME` para buildear desde línea de comandos/CI — ver
+  comando abajo. (Antes se usaba el JBR 21 de Android Studio; si tu instalación
+  aún lo trae, también sirve.)
+- **Setup de dev en Android (verificado 2026-10-06)**:
+  - SDK en `%LOCALAPPDATA%\Android\Sdk`; AVD `Medium_Phone_API_37.0`.
+  - La app carga el dev server de Next en `http://10.0.2.2:3000`, por lo que
+    `sazono-ui/next.config.ts` necesita `allowedDevOrigins: ["10.0.2.2"]`; sin
+    eso el WebView queda en skeletons para siempre.
+  - `npx cap run android` falla en Windows (`'gradlew' not found`): buildear con
+    `.\gradlew.bat assembleDebug` dentro de `sazono-staff-app/android` e
+    instalar con `adb install -r`.
+  - `android/app/google-services.json` (proyecto Firebase "Sazono", id
+    `sazono-e4d41`, app `com.sazono.staff`) está gitignored; se re-descargó de
+    Firebase console > Project settings el 2026-10-06. Sin él la app se cae al
+    conceder el permiso de notificaciones; con él Firebase inicializa y se
+    obtiene un token de registro FCM (verificado en el emulador).
+  - El backend corre desde `dist/`: tras cambios, `npm run build` y reiniciar.
 - **`@capacitor/push-notifications` instalado y probado de punta a punta en
   Android** (2026-07-20). Ver sección "Push notifications" más abajo para el
   detalle completo — resumen: funciona, pero el código que registra el
@@ -85,11 +99,17 @@ Confirmado en el log del emulador: `WHPX ... accelerator is operational`.
 #    "gradlew" no se reconoce como un comando interno o externo" — no
 #    resuelve el binario en Windows. Usar el camino manual:
 cd android
-JAVA_HOME="C:\Program Files\Android\Android Studio\jbr" ./gradlew.bat assembleDebug
+JAVA_HOME="<ruta al JDK 21 Temurin>" ./gradlew.bat assembleDebug
 cd ..
 adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 adb shell monkey -p com.sazono.staff -c android.intent.category.LAUNCHER 1
 ```
+
+**Actualización 2026-10-06:** el dev server necesita
+`allowedDevOrigins: ["10.0.2.2"]` en `sazono-ui/next.config.ts` (ya
+configurado); sin eso la app queda en skeletons para siempre. Es probable que
+esa fuera la causa del congelamiento descrito abajo (no re-verificado contra
+el diagnóstico original, que se conserva como historial).
 
 **Gotcha importante — usar build de PRODUCCIÓN de `sazono-ui`, no el dev
 server, para probar en el emulador.** Contra `npm run dev` (Turbopack), la
@@ -169,11 +189,12 @@ servicio, los dos puntos de enganche de `create-waiter-order.service.ts` y
 repite acá.
 
 **Pendiente:**
-- Envío real de punta a punta sin probar — faltan las credenciales del Admin SDK
-  (`FIREBASE_PROJECT_ID`/`CLIENT_EMAIL`/`PRIVATE_KEY` en
-  `sazono-backend-monolith/.env`, hoy vacías) y mandar un push FCM real con la
-  app en primer plano (solo se probó el plugin de notificaciones locales en
-  aislamiento, no el pipeline completo).
+- ✅ Envío real de punta a punta verificado (2026-10-06): con las credenciales
+  del Admin SDK en `sazono-backend-monolith/.env`, un mesero abrió una mesa
+  virtual (ticket #8, "Push test"), pidió, cocina marcó el ticket `READY` y el
+  push "Pedido listo" llegó al emulador Android. Sin verificar por separado: push
+  a otros meseros/cajeros en mesas virtuales y la gestión del proyecto/claves
+  Firebase en producción.
 - iOS: sigue sin tocar (bloqueado por Apple Developer Program, ver sección
   de CI más abajo). Cuando exista esa cuenta, falta además: registrar la
   app iOS en el mismo proyecto Firebase (bundle id `com.sazono.staff`),
@@ -215,5 +236,5 @@ npx cap open android         # abre Android Studio (requiere tenerlo instalado)
 
 # Build de debug desde línea de comandos (Windows, ver gotcha de JDK arriba):
 cd android
-JAVA_HOME="C:\Program Files\Android\Android Studio\jbr" ./gradlew.bat assembleDebug
+JAVA_HOME="<ruta al JDK 21 Temurin>" ./gradlew.bat assembleDebug
 ```
