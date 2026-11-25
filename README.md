@@ -238,3 +238,30 @@ npx cap open android         # abre Android Studio (requiere tenerlo instalado)
 cd android
 JAVA_HOME="<ruta al JDK 21 Temurin>" ./gradlew.bat assembleDebug
 ```
+
+## Plugin de impresion ESC/POS (EscposPrinter)
+
+Plugin local en Kotlin: `android/app/src/main/java/com/sazono/staff/EscposPrinterPlugin.kt`,
+registrado en `MainActivity.java` con `registerPlugin(...)` antes de `super.onCreate`.
+Requiere el plugin `org.jetbrains.kotlin.android` (agregado en `android/build.gradle` y
+`android/app/build.gradle`). Lado JS en `sazono-ui/src/features/print-client/native/escpos-printer.ts`.
+
+API (`EscposPrinter`), todas las llamadas son sin estado:
+
+- `printTcp({ host, port, bytesBase64, timeoutMs? })` -> `{ bytes }`. Errores: `TIMEOUT`, `REFUSED`, `UNREACHABLE` (el mensaje incluye el tiempo real transcurrido), `IO_ERROR`, `INVALID_ARGUMENT` (mensajes `host requerido`, `puerto invalido`, `payload vacio`, `base64 invalido`), `PAYLOAD_TOO_LARGE` (mas de 512 KiB, se rechaza antes de conectar; tambien en `printBluetooth`).
+- `listBluetoothPrinters()` -> `{ devices: [{ name, address }] }` (solo impresoras ya emparejadas en Ajustes de Android).
+- `printBluetooth({ address, bytesBase64 })` -> `{ bytes }`. SPP `00001101-0000-1000-8000-00805F9B34FB`. Errores: `BT_UNAVAILABLE`, `BT_PERMISSION_DENIED`, `BT_DEVICE_NOT_FOUND`, `BT_CONNECT_FAILED`. En Android 12+ pide `BLUETOOTH_CONNECT` en tiempo de ejecucion.
+- `keepAwake({ enabled })` mantiene la pantalla encendida (FLAG_KEEP_SCREEN_ON) mientras corre el bucle de impresion.
+
+La parte Bluetooth esta escrita pero NO probada (falta hardware).
+
+### Prueba manual contra el emulador TCP (sin impresora)
+
+1. En `sazono-backend-monolith`: `npm run printer:emulator` (escucha en el host, puerto 9100).
+2. Backend y `sazono-ui` (`npm run dev`) corriendo en el host; en el admin crear una impresora con transporte `APP_BRIDGE` y conexion `{ "via": "tcp", "host": "10.0.2.2", "port": 9100 }`, asignada a una estacion.
+3. Compilar: `set JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot`, luego `.\gradlew.bat assembleDebug` en `android/`.
+4. Instalar en el AVD: `adb install -r android\app\build\outputs\apk\debug\app-debug.apk` y abrir la app (login staff, `/staff/kitchen`).
+5. Emparejar el dispositivo con el codigo de la pantalla "Esta pantalla imprime", asignar la impresora.
+6. Crear un pedido o usar "Imprimir prueba": el recibo debe aparecer en la salida del emulador y el trabajo pasar a PRINTED.
+7. Fallos: apagar el emulador -> trabajo con error `REFUSED` y reintento con backoff; host inexistente -> `TIMEOUT`/`UNREACHABLE`.
+8. Bluetooth (con hardware): emparejar la impresora en Ajustes, conexion `{ "via": "bluetooth", "address": "AA:BB:CC:DD:EE:FF" }`, aceptar el permiso al primer uso.
